@@ -96,7 +96,7 @@ async function sendAutomationResponse(
   token: string,
   recipient: { id?: string; comment_id?: string },
   content: any,
-  opts: { skipTyping?: boolean } = {},
+  opts: { skipTyping?: boolean; senderId?: string } = {},
 ) {
   const delaySeconds = Number(content.delay_seconds) || 0
   const useTyping = content.typing_indicator === true && recipient.id && !opts.skipTyping
@@ -117,10 +117,19 @@ async function sendAutomationResponse(
       result = await sendTextDM(token, recipient, content.message, quickReplies)
     }
   } else if (content.card) {
-    if (content.intro_message) {
-      await sendTextDM(token, recipient, content.intro_message)
+    if (recipient.comment_id && opts.senderId) {
+      // Instagram allows only ONE private reply per comment: send the card first (button visible),
+      // then the explanation text to the user's id (the conversation is open after the first reply).
+      result = await sendCardDM(token, recipient, content.card)
+      if (result?.ok && content.intro_message) {
+        await sendTextDM(token, { id: opts.senderId }, content.intro_message)
+      }
+    } else {
+      if (content.intro_message && !recipient.comment_id) {
+        await sendTextDM(token, recipient, content.intro_message)
+      }
+      result = await sendCardDM(token, recipient, content.card)
     }
-    result = await sendCardDM(token, recipient, content.card)
   } else if (content.message) {
     result = await sendTextDM(token, recipient, content.message, quickReplies)
   } else {
@@ -306,7 +315,7 @@ export async function POST(request: NextRequest) {
             })
             console.log(`[webhook] FB public reply status=${pr.status} ${(await pr.text()).slice(0, 220)}`)
           } catch (e) { console.error("[webhook] FB public reply failed", e) }
-          const r = await sendAutomationResponse(user.access_token, { comment_id: v.comment_id }, fbContent, { skipTyping: true })
+          const r = await sendAutomationResponse(user.access_token, { comment_id: v.comment_id }, fbContent, { skipTyping: true, senderId: v.from?.id ? String(v.from.id) : undefined })
           console.log(`[webhook] FB page comment ${v.comment_id}: private reply ok=${r?.ok}`)
         }
         continue
@@ -391,7 +400,7 @@ export async function POST(request: NextRequest) {
                             user.access_token,
                             { comment_id: commentId },
                             content,
-                            { skipTyping: true },
+                            { skipTyping: true, senderId },
                           )
                         }
                       } else if (followResult.follows === false) {
@@ -433,7 +442,7 @@ export async function POST(request: NextRequest) {
                               user.access_token,
                               { comment_id: commentId },
                               content,
-                              { skipTyping: true },
+                              { skipTyping: true, senderId },
                             )
                           }
                         }
@@ -448,7 +457,7 @@ export async function POST(request: NextRequest) {
                           user.access_token,
                           { comment_id: commentId },
                           content,
-                          { skipTyping: true },
+                          { skipTyping: true, senderId },
                         )
                       }
                     }
