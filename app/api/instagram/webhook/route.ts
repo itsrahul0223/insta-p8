@@ -287,7 +287,14 @@ export async function POST(request: NextRequest) {
           if (change.field !== "feed" || v?.item !== "comment" || v?.verb !== "add" || !v?.comment_id) continue
           if (String(v.from?.id) === String(user.page_id)) continue // our own replies
           if (v.parent_id && v.parent_id !== v.post_id) continue // only top-level comments
-          const fbRule = automations.find((a: any) => a.trigger_source === "comment" && !a.specific_media_id && a.trigger_type === "reply_all")
+          // A rule can be tied to one Facebook reel/video via response_content.fb_post_id (matches post_id / video_id / parent_id)
+          const fbIds = [v.post_id, v.video_id, v.parent_id].filter(Boolean).map(String)
+          const fbSpecific = automations.find((a: any) => {
+            if (a.trigger_source !== "comment" || a.trigger_type !== "reply_all") return false
+            const fid = parseContent(a.response_content)?.fb_post_id
+            return !!fid && fbIds.some((x: string) => x === String(fid) || x.endsWith("_" + String(fid)))
+          })
+          const fbRule = fbSpecific || automations.find((a: any) => a.trigger_source === "comment" && !a.specific_media_id && !parseContent(a.response_content)?.fb_post_id && a.trigger_type === "reply_all")
           if (!fbRule) continue
           const fbContent = parseContent(fbRule.response_content)
           const pool: string[] = Array.isArray(fbContent.public_replies) && fbContent.public_replies.filter(Boolean).length ? fbContent.public_replies.filter(Boolean) : DEFAULT_PUBLIC_REPLIES
