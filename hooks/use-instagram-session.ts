@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 
 export function useInstagramSession() {
@@ -9,6 +9,7 @@ export function useInstagramSession() {
     const [profilePic, setProfilePic] = useState<string | null>(null)
     const [isLoading, setIsLoading] = useState(true)
 
+    const usedCode = useRef<string | null>(null)
     const searchParams = useSearchParams()
     const router = useRouter()
 
@@ -18,6 +19,8 @@ export function useInstagramSession() {
         const handleSession = async () => {
             // CASE A: New Login from Instagram
             if (code) {
+                if (usedCode.current === code) return
+                usedCode.current = code
                 try {
                     const res = await fetch("/api/instagram/callback", {
                         method: "POST",
@@ -34,7 +37,11 @@ export function useInstagramSession() {
                         setUsername(data.username)
                         setProfilePic(data.profilePic || null)
                         // Remove code from URL
+                        localStorage.removeItem("ig_login_error")
                         router.replace("/dashboard")
+                    } else {
+                        localStorage.setItem("ig_login_error", String(data.error || "unknown"))
+                        console.error("Login failed:", data)
                     }
                 } catch (err) {
                     console.error("Login failed:", err)
