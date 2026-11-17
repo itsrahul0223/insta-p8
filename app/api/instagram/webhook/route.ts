@@ -706,7 +706,7 @@ export async function POST(request: NextRequest) {
                     // ---------- Follow gate for DMs ----------
                     const attemptKey = unlockKey(senderId, match.id)
 
-                    if (content.check_follow === true) {
+                    if (content.check_follow === true && body.object !== "page") {
                       if (isUnlockEvent) {
                         // Explicit unlock path: user tapped "I Followed!" — re-verify before delivering.
                         // Rate-limit gate cards on unverifiable results; after N attempts, send a single
