@@ -36,65 +36,64 @@ export async function POST(request: NextRequest) {
       throw new Error("Missing Env Vars: Check INSTAGRAM_APP_ID")
     }
 
-    // 2. Exchange Code for Short Token
-    const tokenParams = new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
-      grant_type: "authorization_code",
-      redirect_uri: redirectUri,
-      code,
-    })
+    const G = "https://graph.facebook.com/v24.0"
 
-    const tokenRes = await fetch("https://api.instagram.com/oauth/access_token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: tokenParams.toString(),
-    })
-
+    // 2. Exchange code for a short-lived user token
+    const tokenRes = await fetch(
+      `${G}/oauth/access_token?` +
+        new URLSearchParams({ client_id: clientId, client_secret: clientSecret, redirect_uri: redirectUri, code }).toString(),
+    )
     const tokenData = await tokenRes.json()
-    if (!tokenRes.ok) {
-      if (tokenData.error_message?.includes("authorization code has been used")) {
-        // Harmless double-fire from React StrictMode or double clicks
+    if (!tokenRes.ok || tokenData.error) {
+      if (tokenData.error?.message?.includes("has been used")) {
         return NextResponse.json({ error: "Code already used" }, { status: 400 })
       }
-      console.error("[v0] 🔴 Token Error:", JSON.stringify(tokenData, null, 2))
-      return NextResponse.json({ error: tokenData.error_description || "Token failed" }, { status: 400 })
+      console.error("[auth] token error:", JSON.stringify(tokenData))
+      return NextResponse.json({ error: tokenData.error?.message || "Token failed" }, { status: 400 })
     }
 
-    const shortToken = tokenData.access_token
-    const loginUserId = tokenData.user_id.toString()
-
-    // 3. Exchange for Long Token (60 Days)
-    const longLivedUrl = `https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${clientSecret}&access_token=${shortToken}`
-    const longRes = await fetch(longLivedUrl)
+    // 3. Long-lived user token (60 days). Page tokens derived from it do not expire.
+    const longRes = await fetch(
+      `${G}/oauth/access_token?grant_type=fb_exchange_token&client_id=${clientId}&client_secret=${clientSecret}&fb_exchange_token=${tokenData.access_token}`,
+    )
     const longData = await longRes.json()
-    const accessToken = longData.access_token || shortToken
-    const expiresIn = longData.expires_in || 5184000
+    const userToken = longData.access_token || tokenData.access_token
 
-    // 4. Get Username + IG Professional Account ID (webhook-matching ID)
-    // Per Meta docs: /me?fields=user_id returns the IG_ID that matches webhook entry.id
-    // https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/get-started
-    let username = `user_${loginUserId}`
-    let businessAccountId = loginUserId // fallback
-    let profilePic: string | null = null
-
-    try {
-      const meRes = await fetch(
-        `https://graph.instagram.com/v24.0/me?fields=user_id,username,profile_picture_url&access_token=${accessToken}`
+    // 4. Find the Facebook Page linked to an Instagram professional account
+    const pagesRes = await fetch(
+      `${G}/me/accounts?fields=id,name,access_token,instagram_business_account{id,username,profile_picture_url}&limit=50&access_token=${userToken}`,
+    )
+    const pagesData = await pagesRes.json()
+    const page = (pagesData.data || []).find((p: any) => p.instagram_business_account?.id)
+    if (!page) {
+      return NextResponse.json(
+        { error: "No Facebook Page with a linked Instagram professional account was found. Link your Instagram account to a Page and try again." },
+        { status: 400 },
       )
-      const meData = await meRes.json()
-      console.log("[v0] 📋 /me response:", JSON.stringify(meData))
+    }
 
-      if (meData.username) username = meData.username
-      if (meData.profile_picture_url) profilePic = meData.profile_picture_url
-      if (meData.user_id) {
-        businessAccountId = meData.user_id.toString()
-        console.log(`[v0] 🎯 Got IG Professional Account ID (user_id): ${businessAccountId}`)
-      } else {
-        console.warn(`[v0] ⚠️ /me did not return user_id, using loginUserId: ${loginUserId}`)
-      }
+    const pageToken: string = page.access_token
+    const pageId: string = page.id
+    const businessAccountId: string = page.instagram_business_account.id.toString()
+    const username: string = page.instagram_business_account.username || `user_${businessAccountId}`
+    const profilePic: string | null = page.instagram_business_account.profile_picture_url || null
+    const loginUserId = businessAccountId
+    const accessToken = pageToken
+    const expiresIn = 5184000
+
+    // 5. Subscribe the Page so webhooks (messages, comments) reach us
+    try {
+      const subRes = await fetch(`${G}/${pageId}/subscribed_apps`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          subscribed_fields: "messages,messaging_postbacks,feed",
+          access_token: pageToken,
+        }).toString(),
+      })
+      console.log("[auth] page subscribe:", JSON.stringify(await subRes.json()))
     } catch (e) {
-      console.error("[v0] /me request failed:", e)
+      console.error("[auth] page subscribe failed:", e)
     }
 
     // 6. Save/Update User
@@ -106,7 +105,7 @@ export async function POST(request: NextRequest) {
       token_expires_at: new Date(Date.now() + expiresIn * 1000).toISOString(),
       updated_at: new Date().toISOString(),
       business_account_id: businessAccountId,
-      page_id: businessAccountId, // Always keep in sync
+      page_id: pageId,
     }
 
     console.log(`[v0] 💾 Saving user: ${username} | id=${loginUserId} | biz_id=${businessAccountId}`)

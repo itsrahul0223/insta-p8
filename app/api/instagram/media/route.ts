@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     // 1. Get Access Token
     const { data: user } = await supabase
       .from("users")
-      .select("access_token") // Business ID ki zaroorat nahi hai ab
+      .select("access_token, business_account_id")
       .eq("id", userId)
       .single()
 
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     // 2. Fetch Media (Smart Method: /me/media)
     // Ye 'instagram.com' use karega jo aapke token ke saath compatible hai.
     // Hum '/me' use kar rahe hain taaki ID mismatch ka lafda hi na ho.
-    const url = `https://graph.instagram.com/me/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp&limit=24&access_token=${user.access_token}`
+    const url = `https://graph.facebook.com/v24.0/${user.business_account_id}/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp&limit=24&access_token=${user.access_token}`
 
     console.log("[v0] Fetching Media from:", url)
 

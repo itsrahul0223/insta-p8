@@ -137,7 +137,7 @@ function responsePreviewText(content: any): string {
 
 // ============================================================
 // Instagram API Helper: Verifies actual follow status
-// API: GET https://graph.instagram.com/v21.0/{recipientId}?fields=is_user_follow_business
+// API: GET https://graph.facebook.com/v24.0/{recipientId}?fields=is_user_follow_business
 // Returns:
 //   { follows: true, error: undefined }  → confirmed following
 //   { follows: false, error: undefined } → confirmed NOT following
@@ -146,7 +146,7 @@ function responsePreviewText(content: any): string {
 // ============================================================
 async function verifyFollowStatus(igScopedId: string, pageAccessToken: string): Promise<{ follows: boolean | null; error?: 'auth' | 'transient' }> {
   try {
-    const url = `https://graph.instagram.com/v21.0/${igScopedId}?fields=is_user_follow_business&access_token=${pageAccessToken}`
+    const url = `https://graph.facebook.com/v24.0/${igScopedId}?fields=is_user_follow_business&access_token=${pageAccessToken}`
     // 5s timeout -- Graph API is fast, anything longer means trouble
     const response = await fetch(url, { signal: AbortSignal.timeout(5000) })
     if (!response.ok) {

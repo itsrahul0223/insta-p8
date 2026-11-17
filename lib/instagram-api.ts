@@ -1,4 +1,4 @@
-const GRAPH = "https://graph.instagram.com/v24.0"
+const GRAPH = "https://graph.facebook.com/v24.0"
 
 export interface IGButton {
   type: "web_url" | "postback"
