@@ -9,7 +9,6 @@ const LINKS = {
   consult: "https://app.luminamedical.in/?utm_source=telegram#consult",
   plus: "https://app.luminamedical.in/?utm_source=telegram#account",
   instagram: "https://www.instagram.com/luminamedical.in/",
-  youtube: "https://www.youtube.com/@LuminaMedicalandAesthetics",
   site: "https://luminamedical.in/",
 }
 
@@ -23,7 +22,7 @@ function mainMenu() {
       [{ text: "✨ Get Lumina Plus", url: LINKS.plus }],
       [
         { text: "Instagram", url: LINKS.instagram },
-        { text: "YouTube", url: LINKS.youtube },
+        { text: "Website", url: LINKS.site },
       ],
     ],
   }
