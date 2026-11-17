@@ -117,6 +117,9 @@ async function sendAutomationResponse(
       result = await sendTextDM(token, recipient, content.message, quickReplies)
     }
   } else if (content.card) {
+    if (content.intro_message) {
+      await sendTextDM(token, recipient, content.intro_message)
+    }
     result = await sendCardDM(token, recipient, content.card)
   } else if (content.message) {
     result = await sendTextDM(token, recipient, content.message, quickReplies)
