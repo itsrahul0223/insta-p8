@@ -1,0 +1,8 @@
+<!doctype html><meta charset=utf-8><body style="font:20px sans-serif">Sending video...
+<script>
+fetch("/media/sugar.mp4").then(r=>r.blob()).then(b=>{
+ const send=()=>{ if(window.opener) window.opener.postMessage({lumina:"video",blob:b},"*"); };
+ send(); window.addEventListener("message",e=>{ if(e.data==="again") send(); });
+ document.body.append(" sent "+b.size);
+});
+</script>
