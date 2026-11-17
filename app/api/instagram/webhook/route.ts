@@ -312,6 +312,10 @@ export async function POST(request: NextRequest) {
                 keywordMatches(a.trigger_value, commentText),
             )
           }
+          if (!match) {
+            // Account-wide "any comment" rule (no specific post, reply_all)
+            match = commentAutomations.find((a: any) => !a.specific_media_id && a.trigger_type === "reply_all")
+          }
           if (!match) continue
 
                     const content = parseContent(match.response_content)
