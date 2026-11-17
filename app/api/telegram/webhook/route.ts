@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
   if (text.startsWith("/start") || text === "hi" || text === "hello" || text === "menu" || text === "/menu") {
     await tg("sendMessage", {
       chat_id: chatId,
-      text: `Hello${first}! Welcome to Lumina Medical & Aesthetics.\n\nWe have doctor-designed 12-week programs (blood pressure, fatty liver, sugar, cholesterol, PCOS, thyroid, weight and more), Lumina Plus, and paid 1:1 doctor video consultations.\n\nChoose below, or type a topic like "sugar" or "PCOS".\n\n${DISCLAIMER}`,
+      text: `Hello${first}! Welcome to Lumina Medical & Aesthetics.\n\n📚 Programs: doctor-designed 12-week plans for one condition each (blood pressure, sugar, fatty liver, cholesterol, PCOS, thyroid, weight and more), with weekly steps, food and activity guidance. A doctor-guided version is also available.\n\n✨ Lumina Plus: extra tools in the Lumina Care app, such as more Ask Lumi chats, meal, walking and sleep plans, a medicine timetable, appointment reminders, health trends and printable reports for your doctor visit.\n\n👨‍⚕️ Doctor consultation: a paid 1:1 video call with a doctor about your program or your own reports.\n\nTap a button below, or type a topic like "sugar" or "PCOS".\n\n${DISCLAIMER}`,
       reply_markup: mainMenu(),
     })
     return NextResponse.json({ ok: true })
