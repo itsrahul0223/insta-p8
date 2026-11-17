@@ -351,7 +351,7 @@ export async function POST(request: NextRequest) {
           }
           if (!match) {
             // Account-wide "any comment" rule (no specific post, reply_all)
-            match = commentAutomations.find((a: any) => !a.specific_media_id && a.trigger_type === "reply_all")
+            match = commentAutomations.find((a: any) => !a.specific_media_id && a.trigger_type === "reply_all" && !parseContent(a.response_content)?.fb_post_id)
           }
           if (!match) continue
 
