@@ -3,6 +3,14 @@
 import { useState, useEffect, useRef } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 
+const inflight = new Map<string, Promise<any>>()
+function exchange(code: string) {
+    if (!inflight.has(code)) {
+        inflight.set(code, fetch("/api/instagram/callback", { method: "POST", body: JSON.stringify({ code }) }).then(r => r.json()))
+    }
+    return inflight.get(code)!
+}
+
 export function useInstagramSession() {
     const [username, setUsername] = useState<string | null>(null)
     const [userId, setUserId] = useState<string | null>(null)
@@ -19,14 +27,8 @@ export function useInstagramSession() {
         const handleSession = async () => {
             // CASE A: New Login from Instagram
             if (code) {
-                if (usedCode.current === code) return
-                usedCode.current = code
                 try {
-                    const res = await fetch("/api/instagram/callback", {
-                        method: "POST",
-                        body: JSON.stringify({ code }),
-                    })
-                    const data = await res.json()
+                    const data = await exchange(code)
 
                     if (data.success) {
                         localStorage.setItem("ig_user_id", data.userId)
