@@ -292,11 +292,12 @@ export async function POST(request: NextRequest) {
           const fbContent = parseContent(fbRule.response_content)
           const pool: string[] = Array.isArray(fbContent.public_replies) && fbContent.public_replies.filter(Boolean).length ? fbContent.public_replies.filter(Boolean) : DEFAULT_PUBLIC_REPLIES
           try {
-            await fetch(`https://graph.facebook.com/v24.0/${v.comment_id}/comments?access_token=${encodeURIComponent(user.access_token)}`, {
+            const pr = await fetch(`https://graph.facebook.com/v24.0/${v.comment_id}/comments?access_token=${encodeURIComponent(user.access_token)}`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ message: pickRandom(pool) }),
             })
+            console.log(`[webhook] FB public reply status=${pr.status} ${(await pr.text()).slice(0, 220)}`)
           } catch (e) { console.error("[webhook] FB public reply failed", e) }
           const r = await sendAutomationResponse(user.access_token, { comment_id: v.comment_id }, fbContent, { skipTyping: true })
           console.log(`[webhook] FB page comment ${v.comment_id}: private reply ok=${r?.ok}`)
