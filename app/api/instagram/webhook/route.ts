@@ -276,6 +276,32 @@ export async function POST(request: NextRequest) {
       if (!automations?.length) continue
 
       // ============================================================
+      //  PART FB: FACEBOOK PAGE COMMENTS -> public reply + Messenger private reply
+      // ============================================================
+      if (entry.changes && body.object === "page") {
+        for (const change of entry.changes) {
+          const v = change.value
+          if (change.field !== "feed" || v?.item !== "comment" || v?.verb !== "add" || !v?.comment_id) continue
+          if (String(v.from?.id) === String(user.page_id)) continue // our own replies
+          if (v.parent_id && v.parent_id !== v.post_id) continue // only top-level comments
+          const fbRule = automations.find((a: any) => a.trigger_source === "comment" && !a.specific_media_id && a.trigger_type === "reply_all")
+          if (!fbRule) continue
+          const fbContent = parseContent(fbRule.response_content)
+          const pool: string[] = Array.isArray(fbContent.public_replies) && fbContent.public_replies.filter(Boolean).length ? fbContent.public_replies.filter(Boolean) : DEFAULT_PUBLIC_REPLIES
+          try {
+            await fetch(`https://graph.facebook.com/v24.0/${v.comment_id}/comments?access_token=${encodeURIComponent(user.access_token)}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ message: pickRandom(pool) }),
+            })
+          } catch (e) { console.error("[webhook] FB public reply failed", e) }
+          const r = await sendAutomationResponse(user.access_token, { comment_id: v.comment_id }, fbContent, { skipTyping: true })
+          console.log(`[webhook] FB page comment ${v.comment_id}: private reply ok=${r?.ok}`)
+        }
+        continue
+      }
+
+      // ============================================================
       //  PART A: COMMENTS
       // ============================================================
       if (entry.changes) {
@@ -366,7 +392,7 @@ export async function POST(request: NextRequest) {
                           await sendCardDM(
                             user.access_token,
                             { comment_id: commentId },
-                            buildFollowGateCard({ username: user.username, ruleId: match.id }),
+                            buildFollowGateCard({ username: user.username, ruleId: match.id, title: content.gate_title, subtitle: content.gate_subtitle }),
                           )
                         }
                       } else {
@@ -382,7 +408,7 @@ export async function POST(request: NextRequest) {
                             await sendCardDM(
                               user.access_token,
                               { comment_id: commentId },
-                              buildFollowGateCard({ username: user.username, ruleId: match.id }),
+                              buildFollowGateCard({ username: user.username, ruleId: match.id, title: content.gate_title, subtitle: content.gate_subtitle }),
                             )
                           }
                         } else {
@@ -481,14 +507,14 @@ export async function POST(request: NextRequest) {
                                               await sendAutomationResponse(user.access_token, { id: senderId }, content)
                                             } else if (followResult.follows === false) {
                                               console.log(`[webhook] 🔒 Story follower gate: @${senderId} doesn't follow @${user.username}`)
-                                              await sendCardDM(user.access_token, { id: senderId }, buildFollowGateCard({ username: user.username, ruleId: match.id }))
+                                              await sendCardDM(user.access_token, { id: senderId }, buildFollowGateCard({ username: user.username, ruleId: match.id, title: content.gate_title, subtitle: content.gate_subtitle }))
                                             } else {
                                               // null → unverifiable. Distinguish auth vs transient.
                                               const isAuthError = followResult.error === 'auth'
                                               if (isAuthError) {
                                                 // Auth failure — fail CLOSED: send gate
                                                 console.warn(`[webhook] ⚠️ Story follower gate auth failure for @${senderId}; sending gate`)
-                                                await sendCardDM(user.access_token, { id: senderId }, buildFollowGateCard({ username: user.username, ruleId: match.id }))
+                                                await sendCardDM(user.access_token, { id: senderId }, buildFollowGateCard({ username: user.username, ruleId: match.id, title: content.gate_title, subtitle: content.gate_subtitle }))
                                               } else {
                                                 // Transient failure — fail OPEN: deliver content
                                                 console.warn(`[webhook] ⚠️ Story follower gate transient failure for @${senderId}; failing open`)
